@@ -1,50 +1,47 @@
-var crypto = require('crypto');
-var request = require('request');
-//var resource = require('./cli.js');
+const http = require('node:http');
 
-//var resource = 'accounts'
-//function send(resource) {
-function send(resource) {
+http.get('http://localhost:8000/', (res) => {
+  const { statusCode } = res;
+  const contentType = res.headers['content-type'];
 
-var apiKey = '2q7DfBj1Gcik5lBE';
-var apiSecret = 'ArtDbY362yWeW35whuXNeQzYC5nunFTW';
+  let error;
+  // Any 2xx status code signals a successful response but
+  // here we're only checking for 200.
+  if (statusCode !== 200) {
+    error = new Error('Request Failed.\n' +
+                      `Status Code: ${statusCode}`);
+  } else if (!/^application\/json/.test(contentType)) {
+    error = new Error('Invalid content-type.\n' +
+                      `Expected application/json but received ${contentType}`);
+  }
+  if (error) {
+    console.error(error.message);
+    // Consume response data to free up memory
+    res.resume();
+    return;
+  }
 
-var timestamp = Math.floor(Date.now() / 1000);
-
-var req = {
-    method: 'GET',
-    path: '/api/v3/brokerage' + resource,
-    body: ''
-};
-
-var message = timestamp + req.method + req.path + req.body;
-
-//var signature = CryptoJS.hmacsha256("sha256", apiSecret)
-var signature = crypto.createHmac("sha256", apiSecret).update(message).digest("hex");
-
-var options = {
-    baseUrl: 'https://api.coinbase.com/',
-    url: req.path,
-    method: req.method,
-    headers: {
-        'CB-ACCESS-SIGN': signature,
-        'CB-ACCESS-TIMESTAMP': timestamp,
-        'CB-ACCESS-KEY': apiKey,
-        'CB-VERSION': '2015-07-22'
+  res.setEncoding('utf8');
+  let rawData = '';
+  res.on('data', (chunk) => { rawData += chunk; });
+  res.on('end', () => {
+    try {
+      const parsedData = JSON.parse(rawData);
+      console.log(parsedData);
+    } catch (e) {
+      console.error(e.message);
     }
-};
-
-request(options,function(err, response){
-    if (err) console.log(err);
-    console.log(response.body);
-    return response.body
-
+  });
+}).on('error', (e) => {
+  console.error(`Got error: ${e.message}`);
 });
-}
 
-//send('accounts')
+// Create a local server to receive data from
+const server = http.createServer((req, res) => {
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({
+    data: 'Hello World!',
+  }));
+});
 
-
-module.exports = {
-send
-}
+server.listen(8000);
